@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粒子生命模拟</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#F59E0B',
+                        dark: '#1E293B',
+                        light: '#F8FAFC'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .text-shadow-lg {
+                text-shadow: 0 4px 8px rgba(0,0,0,0.25);
+            }
+            .bg-gradient-overlay {
+                background: linear-gradient(rgba(30, 41, 59, 0.85), rgba(30, 41, 59, 0.95));
+            }
+            .card-hover {
+                transition: all 0.3s ease;
+            }
+            .card-hover:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-dark text-light font-sans overflow-x-hidden">
+    <!-- 粒子背景画布 -->
+    <canvas id="particle-bg" class="fixed top-0 left-0 w-full h-full z-0 opacity-20"></canvas>
+
+    <!-- 导航栏 -->
+    <nav class="fixed top-0 left-0 w-full bg-dark/80 backdrop-blur-md z-50 border-b border-gray-800">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="#" class="text-xl font-bold text-primary flex items-center">
+                <i class="fa fa-particle-dots mr-2"></i>
+                <span>粒子生命</span>
+            </a>
+            <div class="hidden md:flex space-x-8">
+                <a href="#about" class="hover:text-primary transition-colors">关于</a>
+                <a href="#demos" class="hover:text-primary transition-colors">演示</a>
+                <a href="#usage" class="hover:text-primary transition-colors">使用方法</a>
+                <a href="#code" class="hover:text-primary transition-colors">代码</a>
+                <a href="#ports" class="hover:text-primary transition-colors">其他版本</a>
+                <a href="#todos" class="hover:text-primary transition-colors">待办事项</a>
+            </div>
+            <button class="md:hidden text-2xl" id="menu-toggle">
+                <i class="fa fa-bars"></i>
+            </button>
+        </div>
+        <!-- 移动端菜单 -->
+        <div id="mobile-menu" class="hidden md:hidden bg-dark border-b border-gray-800">
+            <div class="container mx-auto px-4 py-2 flex flex-col space-y-3">
+                <a href="#about" class="py-2 hover:text-primary transition-colors">关于</a>
+                <a href="#demos" class="py-2 hover:text-primary transition-colors">演示</a>
+                <a href="#usage" class="py-2 hover:text-primary transition-colors">使用方法</a>
+                <a href="#code" class="py-2 hover:text-primary transition-colors">代码</a>
+                <a href="#ports" class="py-2 hover:text-primary transition-colors">其他版本</a>
+                <a href="#todos" class="py-2 hover:text-primary transition-colors">待办事项</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 英雄区域 -->
+    <header class="relative min-h-screen flex items-center justify-center pt-16">
+        <div class="container mx-auto px-4 z-10 text-center">
+            <h1 class="text-[clamp(2.5rem,5vw,4rem)] font-bold mb-6 text-shadow-lg">
+                粒子生命 <span class="text-primary">模拟</span>
+            </h1>
+            <p class="text-[clamp(1rem,2vw,1.25rem)] text-gray-300 max-w-3xl mx-auto mb-10 leading-relaxed">
+                一个简单的程序，通过原子般粒子间的吸引或排斥规则模拟原始人工生命，
+                产生复杂的自组织类生命模式。
+            </p>
+            <div class="flex flex-col sm:flex-row justify-center gap-4 mb-16">
+                <a href="#demos" class="bg-primary hover:bg-primary/90 text-white font-medium py-3 px-8 rounded-lg transition-all shadow-lg hover:shadow-primary/30">
+                    尝试演示
+                </a>
+                <a href="#code" class="bg-transparent border border-gray-600 hover:border-primary text-light font-medium py-3 px-8 rounded-lg transition-all">
+                    查看代码
+                </a>
+            </div>
+            <div class="animate-bounce absolute bottom-10 left-1/2 transform -translate-x-1/2">
+                <i class="fa fa-chevron-down text-2xl text-gray-400"></i>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-20 relative z-10">
+        <!-- 关于部分 -->
+        <section id="about" class="mb-32">
+            <div class="max-w-3xl mx-auto">
+                <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-8 text-center">关于项目</h2>
+                <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-8 border border-gray-800 shadow-xl">
+                    <p class="text-gray-300 mb-6 leading-relaxed">
+                        本项目通过原子般粒子间简单的吸引或排斥规则模拟原始人工生命。
+                        值得注意的是，尽管规则简单，粒子却能形成复杂的自组织类生命模式。
+                    </p>
+                    <p class="text-gray-300 mb-6 leading-relaxed">
+                        排除GUI元素，核心代码不到一页。这展示了复杂性如何从简单性中涌现。
+                    </p>
+                    
+                    <div class="mt-10">
+                        <h3 class="text-xl font-semibold mb-4 text-primary">灵感来源</h3>
+                        <p class="text-gray-300 leading-relaxed">
+                            本项目灵感来自Jeffery Ventrella的Clusters。与其他粒子生命项目不同，
+                            本实现不包含碰撞检测，因此可以实时模拟数千个粒子。
+                            GUI控制允许实时调整参数，便于探索和发现新模式。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 演示部分 -->
+        <section id="demos" class="mb-32">
+            <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-12 text-center">在线演示</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                <!-- 2D 演示卡片 -->
+                <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl overflow-hidden border border-gray-800 shadow-xl card-hover">
+                    <div class="h-64 bg-gray-800 flex items-center justify-center">
+                        <div class="text-center p-4">
+                            <i class="fa fa-cube text-6xl text-primary mb-4"></i>
+                            <h3 class="text-xl font-semibold mb-2">2D粒子生命</h3>
+                            <p class="text-gray-400">交互式2D模拟</p>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <a href="https://hunar4321.github.io/particle-life/particle_life.html" target="_blank" rel="noopener noreferrer" class="block w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg transition-all text-center">
+                            <i class="fa fa-external-link mr-2"></i> 启动2D演示
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 3D 演示卡片 -->
+                <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl overflow-hidden border border-gray-800 shadow-xl card-hover">
+                    <div class="h-64 bg-gray-800 flex items-center justify-center">
+                        <div class="text-center p-4">
+                            <i class="fa fa-cubes text-6xl text-secondary mb-4"></i>
+                            <h3 class="text-xl font-semibold mb-2">3D粒子生命</h3>
+                            <p class="text-gray-400">交互式3D模拟</p>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <a href="https://hunar4321.github.io/particle-life/particle_life_3d.html" target="_blank" rel="noopener noreferrer" class="block w-full bg-secondary hover:bg-secondary/90 text-white font-medium py-3 px-6 rounded-lg transition-all text-center">
+                            <i class="fa fa-external-link mr-2"></i> 启动3D演示
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 视频教程 -->
+            <div class="mt-16 max-w-3xl mx-auto bg-gray-900/50 backdrop-blur-sm rounded-xl p-8 border border-gray-800 shadow-xl">
+                <h3 class="text-xl font-semibold mb-6 text-center">视频教程与演示</h3>
+                <div class="aspect-video bg-gray-800 rounded-lg overflow-hidden flex items-center justify-center">
+                    <a href="https://youtu.be/0Kx4Y9TVMGg" target="_blank" rel="noopener noreferrer" class="text-center p-4">
+                        <i class="fa fa-play-circle text-6xl text-red-500 mb-4"></i>
+                        <p class="text-gray-300">在YouTube上观看</p>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- 使用说明部分 -->
+        <section id="usage" class="mb-32">
+            <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-12 text-center">使用方法</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
+                <!-- 桌面版本使用说明 -->
+                <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-8 border border-gray-800 shadow-xl">
+                    <h3 class="text-xl font-semibold mb-6 text-primary flex items-center">
+                        <i class="fa fa-desktop mr-3 text-2xl"></i> 桌面版本（C++）
+                    </h3>
+                    <ol class="space-y-4 text-gray-300">
+                        <li class="flex">
+                            <span class="bg-primary/20 text-primary font-bold rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">1</span>
+                            <span>下载本仓库并解压文件</span>
+                        </li>
+                        <li class="flex">
+                            <span class="bg-primary/20 text-primary font-bold rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">2</span>
+                            <span>导航到 <code class="bg-gray-800 px-2 py-1 rounded text-accent">/particle_life/bin/</code> 文件夹</span>
+                        </li>
+                        <li class="flex">
+                            <span class="bg-primary/20 text-primary font-bold rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">3</span>
+                            <span>点击 <code class="bg-gray-800 px-2 py-1 rounded text-accent">particle_life.exe</code> 启动应用程序</span>
+                        </li>
+                    </ol>
+
+                    <h4 class="text-lg font-medium mt-8 mb-4 text-gray-200">编译源代码方法：</h4>
+                    <ol class="space-y-4 text-gray-300" start="4">
+                        <li class="flex">
+                            <span class="bg-primary/20 text-primary font-bold rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">4</span>
+                            <span>从 <a href="https://openframeworks.cc/" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">openframeworks.cc</a> 下载openFrameworks库</span>
+                        </li>
+                        <li class="flex">
+                            <span class="bg-primary/20 text-primary font-bold rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">5</span>
+                            <span>使用openFrameworks的projectGenerator导入 <code class="bg-gray-800 px-2 py-1 rounded text-accent">/particle_life/</code> 文件夹</span>
+                        </li>
+                        <li class="flex">
+                            <span class="bg-primary/20 text-primary font-bold rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">6</span>
+                            <span>或者，生成新的openFrameworks项目，添加ofxGui，并用提供的/src/文件夹替换</span>
+                        </li>
+                        <li class="flex">
+                            <span class="bg-primary/20 text-primary font-bold rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">7</span>
+                            <span>在您的计算机上编译C++代码</span>
+                        </li>
+                    </ol>
+                </div>
+
+                <!-- 模式重现说明 -->
+                <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-8 border border-gray-800 shadow-xl">
+                    <h3 class="text-xl font-semibold mb-6 text-secondary flex items-center">
+                        <i class="fa fa-lightbulb-o mr-3 text-2xl"></i> 有趣模式的重现方法
+                    </h3>
+                    <div class="text-gray-300 space-y-4">
+                        <p>重现有趣的模式不需要精确匹配参数。请遵循以下提示：</p>
+                        
+                        <ul class="space-y-3 list-disc pl-6">
+                            <li>从随机参数探索开始</li>
+                            <li>一旦发现有趣的模式，尝试逐步微调</li>
+                            <li>为避免陷入局部最优，偶尔进行大幅度参数调整</li>
+                            <li>这种方法将帮助您不断发现新的有趣模式</li>
+                        </ul>
+
+                        <div class="mt-8 p-4 bg-gray-800/70 rounded-lg border border-gray-700">
+                            <h4 class="text-lg font-medium mb-2 text-accent">专业提示</h4>
+                            <p>C++程序的核心算法位于 <code class="bg-gray-900 px-2 py-1 rounded text-white">/particle_life/src/ofApp.cpp</code> 的前100行中。其余部分是openFrameworks提供的GUI组件。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 代码部分 -->
+        <section id="code" class="mb-32">
+            <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-12 text-center">源代码</h2>
+            
+            <div class="max-w-4xl mx-auto">
+                <p class="text-gray-300 text-center mb-10 text-lg">
+                    源代码有C++、JavaScript和Python版本。以下是简单的JavaScript实现。
+                </p>
+
+                <!-- 代码标签页 -->
+                <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-800 shadow-xl overflow-hidden">
+                    <div class="flex border-b border-gray-800">
+                        <button class="code-tab active px-6 py-3 font-medium text-primary bg-gray-800/50" data-target="js-code">JavaScript</button>
+                        <button class="code-tab px-6 py-3 font-medium text-gray-400 hover:text-gray-200 transition-colors" data-target="cpp-code">C++（核心）</button>
+                        <button class="code-tab px-6 py-3 font-medium text-gray-400 hover:text-gray-200 transition-colors" data-target="python-code">Python</button>
+                    </div>
+                    
+                    <!-- JavaScript 代码 -->
+                    <div class="code-content active p-6" id="js-code">
+                        <pre class="bg-gray-900 rounded-lg p-4 overflow-x-auto text-gray-300 text-sm"><code>&lt;canvas id="life" width="500" height="500"&gt;&lt;/canvas&gt;
+&lt;script&gt;
+  //Hunar Ahmad @ brainxyz
+  m = document.getElementById("life").getContext("2d");
+  draw = (x, y, c, s) => {
+    m.fillStyle = c;
+    m.fillRect(x, y, s, s);
+  };
+  atoms = [];
+  atom = (x, y, c) => {
+    return { x: x, y: y, vx: 0, vy: 0, color: c };
+  };
+  random = () => {
+    return Math.random() * 400 + 50;
+  };
+  create = (number, color) => {
+    group = [];
+    for (let i = 0; i < number; i++) {
+      group.push(atom(random(), random(), color));
+      atoms.push(group[i]);
+    }
+    return group;
+  };
+  rule = (atoms1, atoms2, g) => {
+    for (let i = 0; i < atoms1.length; i++) {
+      fx = 0;
+      fy = 0;
+      for (let j = 0; j < atoms2.length; j++) {
+        a = atoms1[i];
+        b = atoms2[j];
+        dx = a.x - b.x;
+        dy = a.y - b.y;
+        d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 0 && d < 80) {
+          F = (g * 1) / d;
+          fx += F * dx;
+          fy += F * dy;
+        }
+      }
+      a.vx = (a.vx + fx) * 0.5;
+      a.vy = (a.vy + fy) * 0.5;
+      a.x += a.vx;
+      a.y += a.vy;
+      if (a.x <= 0 || a.x >= 500) { a.vx *= -1; }
+      if (a.y <= 0 || a.y >= 500) { a.vy *= -1; }
+    }
+  };
+  yellow = create(200, "yellow");
+  red = create(200, "red");
+  green = create(200, "green");
+  update = () => {
+    rule(green, green, -0.32);
+    rule(green, red, -0.17);
+    rule(green, yellow, 0.34);
+    rule(red, red, -0.1);
+    rule(red, green, -0.34);
+    rule(yellow, yellow, 0.15);
+    rule(yellow, green, -0.2);
+    m.clearRect(0, 0, 500, 500);
+    draw(0, 0, "black", 500);
+    for (i = 0; i < atoms.length; i++) {
+      draw(atoms[i].x, atoms[i].y, atoms[i].color, 5);
+    }
+    requestAnimationFrame(update);
+  };
+  update();
+&lt;/script&gt;</code></pre>
+                        <p class="text-gray-400 text-sm mt-4">
+                            注意：更优化的版本，请查看仓库中的 <code class="bg-gray-800 px-2 py-1 rounded">particle_life.html</code> 文件。
+                        </p>
+                    </div>
+                    
+                    <!-- C++ 代码 -->
+                    <div class="code-content hidden p-6" id="cpp-code">
+                        <pre class="bg-gray-900 rounded-lg p-4 overflow-x-auto text-gray-300 text-sm"><code>// 核心算法（/particle_life/src/ofApp.cpp 的前100行）
+#include "ofApp.h"
+
+//--------------------------------------------------------------
+void ofApp::setup(){
+    ofSetFrameRate(60);
+    ofBackground(0);
+    
+    // 创建粒子组
+    int numParticles = 1000;
+    group1 = createGroup(numParticles, ofColor::yellow);
+    group2 = createGroup(numParticles, ofColor::red);
+    group3 = createGroup(numParticles, ofColor::green);
+    group4 = createGroup(numParticles, ofColor::blue);
+    
+    // 设置GUI
+    gui.setup();
+    gui.add(g11.setup("G11", -0.32, -1, 1));
+    gui.add(g12.setup("G12", -0.17, -1, 1));
+    gui.add(g13.setup("G13", 0.34, -1, 1));
+    gui.add(g14.setup("G14", 0.2, -1, 1));
+    
+    gui.add(g21.setup("G21", -0.34, -1, 1));
+    gui.add(g22.setup("G22", -0.1, -1, 1));
+    gui.add(g23.setup("G23", 0.2, -1, 1));
+    gui.add(g24.setup("G24", -0.15, -1, 1));
+    
+    // 更多GUI控件...
+}
+
+//--------------------------------------------------------------
+void ofApp::update(){
+    // 应用规则到所有粒子组
+    applyRule(group1, group1, g11);
+    applyRule(group1, group2, g12);
+    applyRule(group1, group3, g13);
+    applyRule(group1, group4, g14);
+    
+    applyRule(group2, group1, g21);
+    applyRule(group2, group2, g22);
+    applyRule(group2, group3, g23);
+    applyRule(group2, group4, g24);
+    
+    // 更新所有粒子
+    for(auto &p : group1) updateParticle(p);
+    for(auto &p : group2) updateParticle(p);
+    for(auto &p : group3) updateParticle(p);
+    for(auto &p : group4) updateParticle(p);
+}
+
+//--------------------------------------------------------------
+void ofApp::draw(){
+    // 绘制所有粒子
+    for(auto &p : group1) drawParticle(p);
+    for(auto &p : group2) drawParticle(p);
+    for(auto &p : group3) drawParticle(p);
+    for(auto &p : group4) drawParticle(p);
+    
+    // 绘制GUI
+    gui.draw();
+}
+
+// 核心规则应用
+void ofApp::applyRule(vector<Particle> &groupA, vector<Particle> &groupB, float G){
+    for(int i = 0; i < groupA.size(); i++){
+        ofVec2f force;
+        for(int j = 0; j < groupB.size(); j++){
+            if(&groupA[i] != &groupB[j]){
+                ofVec2f diff = groupA[i].pos - groupB[j].pos;
+                float distance = diff.length();
+                
+                if(distance > 0 && distance < 80){
+                    float strength = G / distance;
+                    force += diff.normalize() * strength;
+                }
+            }
+        }
+        groupA[i].vel += force;
+        groupA[i].vel *= 0.5;
+    }
+}
+
+// 更多核心函数...</code></pre>
+                        <p class="text-gray-400 text-sm mt-4">
+                            注意：这是核心C++算法的简化版本。完整代码包含openFrameworks提供的GUI组件和渲染控制。
+                        </p>
+                    </div>
+                    
+                    <!-- Python 代码 -->
+                    <div class="code-content hidden p-6" id="python-code">
+                        <pre class="bg-gray-900 rounded-lg p-4 overflow-x-auto text-gray-300 text-sm"><code>import pygame
+import random
+import math
+
+# 初始化Pygame
+pygame.init()
+width, height = 800, 600
+screen = pygame.display.set_mode((width, height))
+pygame.display.set_caption("粒子生命模拟")
+
+# 粒子类
+class Particle:
+    def __init__(self, x, y, color):
+        self.x = x
+        self.y = y
+        self.vx = 0
+        self.vy = 0
+        self.color = color
+
+# 创建粒子组
+def create_group(number, color):
+    group = []
+    for _ in range(number):
+        x = random.randint(50, width - 50)
+        y = random.randint(50, height - 50)
+        group.append(Particle(x, y, color))
+    return group
+
+# 应用吸引/排斥规则
+def apply_rule(group1, group2, g):
+    for a in group1:
+        fx = 0
+        fy = 0
+        for b in group2:
+            dx = a.x - b.x
+            dy = a.y - b.y
+            distance = math.sqrt(dx*dx + dy*dy)
+            
+            if distance > 0 and distance < 80:
+                force = (g * 1) / distance
+                fx += force * dx
+                fy += force * dy
+        
+        a.vx = (a.vx + fx) * 0.5
+        a.vy = (a.vy + fy) * 0.5
+        
+        a.x += a.vx
+        a.y += a.vy
+        
+        # 边界检查
+        if a.x <= 0 or a.x >= width:
+            a.vx *= -1
+        if a.y <= 0 or a.y >= height:
+            a.vy *= -1
+
+# 创建粒子组
+yellow = create_group(200, (255, 255, 0))
+red = create_group(200, (255, 0, 0))
+green = create_group(200, (0, 255, 0))
+blue = create_group(200, (0, 0, 255))
+
+# 主循环
+running = True
+clock = pygame.time.Clock()
+
+while running:
+    screen.fill((0, 0, 0))
+    
+    # 处理事件
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+    
+    # 应用规则
+    apply_rule(green, green, -0.32)
+    apply_rule(green, red, -0.17)
+    apply_rule(green, yellow, 0.34)
+    apply_rule(red, red, -0.1)
+    apply_rule(red, green, -0.34)
+    apply_rule(yellow, yellow, 0.15)
+    apply_rule(yellow, green, -0.2)
+    
+    # 绘制粒子
+    for particle in yellow + red + green + blue:
+        pygame.draw.circle(screen, particle.color, (int(particle.x), int(particle.y)), 3)
+    
+    pygame.display.flip()
+    clock.tick(60)
+
+pygame.quit()</code></pre>
+                        <p class="text-gray-400 text-sm mt-4">
+                            注意：这是使用Pygame的Python实现。带有GUI控件的完整版本，请查看仓库。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 其他端口部分 -->
+        <section id="ports" class="mb-32">
+            <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-12 text-center">其他版本</h2>
+            
+            <div class="max-w-4xl mx-auto">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    <!-- 端口卡片 -->
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-gamepad text-4xl text-accent mb-4"></i>
+                        <h3 class="text-lg font-semibold">Godot</h3>
+                    </div>
+                    
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-rust text-4xl text-orange-500 mb-4"></i>
+                        <h3 class="text-lg font-semibold">Rust</h3>
+                    </div>
+                    
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-golang text-4xl text-blue-400 mb-4"></i>
+                        <h3 class="text-lg font-semibold">Go</h3>
+                        <p class="text-sm text-gray-400 mt-1">3个版本</p>
+                    </div>
+                    
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-python text-4xl text-yellow-400 mb-4"></i>
+                        <h3 class="text-lg font-semibold">Python</h3>
+                    </div>
+                    
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-code text-4xl text-gray-400 mb-4"></i>
+                        <h3 class="text-lg font-semibold">Lua</h3>
+                    </div>
+                    
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-windows text-4xl text-blue-600 mb-4"></i>
+                        <h3 class="text-lg font-semibold">QB64-PE</h3>
+                    </div>
+                    
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-html5 text-4xl text-orange-600 mb-4"></i>
+                        <h3 class="text-lg font-semibold">WebGL</h3>
+                    </div>
+                    
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-coffee text-4xl text-brown-600 mb-4"></i>
+                        <h3 class="text-lg font-semibold">Java</h3>
+                    </div>
+                    
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-windows text-4xl text-blue-600 mb-4"></i>
+                        <h3 class="text-lg font-semibold">C# Winforms</h3>
+                    </div>
+                    
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-code text-4xl text-gray-400 mb-4"></i>
+                        <h3 class="text-lg font-semibold">FreeBasic</h3>
+                    </div>
+                    
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-code text-4xl text-purple-500 mb-4"></i>
+                        <h3 class="text-lg font-semibold">Julia</h3>
+                    </div>
+                    
+                    <div class="bg-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 shadow-xl text-center card-hover">
+                        <i class="fa fa-android text-4xl text-green-600 mb-4"></i>
+                        <h3 class="text-lg font-semibold">Flutter</h3>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 相关主题部分 -->
+        <section class="mb-32">
+            <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-12 text-center">相关主题</h2>
+            
+            <div class="max-w-3xl mx-auto bg-gray-900/50 backdrop-blur-sm rounded-xl p-8 border border-gray-800 shadow-xl">
+                <div class="flex flex-wrap justify-center gap-4">
+                    <span class="bg-primary/20 text-primary px-4 py-2 rounded-full text-sm font-medium">粒子生命模拟</span>
+                    <span class="bg-secondary/20 text-secondary px-4 py-2 rounded-full text-sm font-medium">原始汤 - 进化</span>
+                    <span class="bg-accent/20 text-accent px-4 py-2 rounded-full text-sm font-medium">康威生命游戏</span>
+                    <span class="bg-purple-500/20 text-purple-400 px-4 py-2 rounded-full text-sm font-medium">元胞自动机</span>
+                    <span class="bg-blue-500/20 text-blue-400 px-4 py-2 rounded-full text-sm font-medium">自组织模式</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- TODO 部分 -->
+        <section id="todos" class="mb-20">
+            <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-12 text-center">未来改进（待办事项）</h2>
+            
+            <div class="max-w-3xl mx-auto bg-gray-900/50 backdrop-blur-sm rounded-xl p-8 border border-gray-800 shadow-xl">
+                <ul class="space-y-4 text-gray-300">
+                    <li class="flex items-start">
+                        <i class="fa fa-check-square-o text-primary mt-1 mr-3"></i>
+                        <span>添加保存和加载参数的功能（方便人们分享发现的有趣模型）</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fa fa-check-square-o text-primary mt-1 mr-3"></i>
+                        <span>能够添加更多粒子类型（目前固定为四种粒子类型）</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fa fa-check-square-o text-primary mt-1 mr-3"></i>
+                        <span>优化嵌套循环（计算所有粒子间的成对距离）以降低二次计算复杂度</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fa fa-check-square-o text-primary mt-1 mr-3"></i>
+                        <span>在GPU上计算成对距离（高度并行问题）</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fa fa-check-square-o text-primary mt-1 mr-3"></i>
+                        <span>添加屏幕 resize 功能，改进快速移动粒子的边界检查</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fa fa-check-square-o text-primary mt-1 mr-3"></i>
+                        <span>添加更直观的UI，以便更精细地控制参数</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fa fa-check-square-o text-primary mt-1 mr-3"></i>
+                        <span>添加随机化按钮或元规则，以连续递归地突变初始规则</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fa fa-check-square-o text-primary mt-1 mr-3"></i>
+                        <span>实现进化算法来选择和优化参数（需要定义"有趣"模式的适应度函数）</span>
+                    </li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-gray-900 border-t border-gray-800 py-12 relative z-10">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-6 md:mb-0">
+                    <a href="#" class="text-xl font-bold text-primary flex items-center">
+                        <i class="fa fa-particle-dots mr-2"></i>
+                        <span>粒子生命模拟</span>
+                    </a>
+                    <p class="text-gray-400 mt-2">从简单中涌现复杂</p>
+                </div>
+                
+                <div class="flex space-x-6">
+                    <a href="https://github.com/hunar4321/particle-life" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-primary transition-colors text-2xl">
+                        <i class="fa fa-github"></i>
+                    </a>
+                    <a href="https://youtu.be/0Kx4Y9TVMGg" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-red-500 transition-colors text-2xl">
+                        <i class="fa fa-youtube-play"></i>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="mt-8 pt-8 border-t border-gray-800 text-center text-gray-500 text-sm">
+                <p>灵感来自Jeffery Ventrella的Clusters</p>
+                <p class="mt-2">© 2025 粒子生命模拟。所有代码均为开源。</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // 移动端菜单切换
+        document.getElementById('menu-toggle').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // 代码标签页切换
+        const codeTabs = document.querySelectorAll('.code-tab');
+        const codeContents = document.querySelectorAll('.code-content');
+
+        codeTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // 移除所有活动状态
+                codeTabs.forEach(t => {
+                    t.classList.remove('active', 'text-primary', 'bg-gray-800/50');
+                    t.classList.add('text-gray-400');
+                });
+                
+                codeContents.forEach(c => {
+                    c.classList.add('hidden');
+                    c.classList.remove('active');
+                });
+                
+                // 添加当前活动状态
+                tab.classList.add('active', 'text-primary', 'bg-gray-800/50');
+                tab.classList.remove('text-gray-400');
+                
+                const target = tab.getAttribute('data-target');
+                document.getElementById(target).classList.remove('hidden');
+                document.getElementById(target).classList.add('active');
+            });
+        });
+
+        // 平滑滚动
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                
+                const targetId = this.getAttribute('href');
+                if (targetId === '#') return;
+                
+                const targetElement = document.querySelector(targetId);
+                if (targetElement) {
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 80,
+                        behavior: 'smooth'
+                    });
+                    
+                    // 关闭移动端菜单
+                    document.getElementById('mobile-menu').classList.add('hidden');
+                }
+            });
+        });
+
+        // 粒子背景效果
+        const canvas = document.getElementById('particle-bg');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        // 设置画布大小
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 粒子类
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = Math.random() * 0.5 - 0.25;
+                this.speedY = Math.random() * 0.5 - 0.25;
+                this.color = `rgba(${Math.floor(Math.random() * 100 + 155)}, ${Math.floor(Math.random() * 100 + 155)}, ${Math.floor(Math.random() * 100 + 155)}, ${Math.random() * 0.5 + 0.1})`;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 创建粒子
+        function initParticles() {
+            particles = [];
+            const particleCount = Math.min(Math.floor(canvas.width * canvas.height / 15000), 150);
+            
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        // 绘制粒子和连接线
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+                
+                // 绘制连接线
+                for (let j = i; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 100) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = `rgba(100, 149, 237, ${0.2 - distance/500})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+
+        // 初始化
+        initParticles();
+        animate();
+
+        // 滚动时导航栏效果
+        window.addEventListener('scroll', function() {
+            const nav = document.querySelector('nav');
+            if (window.scrollY > 50) {
+                nav.classList.add('py-2', 'shadow-lg');
+                nav.classList.remove('py-3');
+            } else {
+                nav.classList.add('py-3');
+                nav.classList.remove('py-2', 'shadow-lg');
+            }
+        });
+    </script>
+</body>
+</html>
